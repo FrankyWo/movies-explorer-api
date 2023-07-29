@@ -1,6 +1,6 @@
 const router = require('express').Router();
 
-const cardRouter = require('./cards');
+const movieRouter = require('./movies');
 const userRouter = require('./users');
 
 const auth = require('../middlewares/auth');
@@ -14,7 +14,7 @@ router.post('/signup', validateCreateUser, createUser);
 router.use(auth);
 
 router.use('/users', userRouter);
-router.use('/cards', cardRouter);
+router.use('/movies', movieRouter);
 router.use((req, res, next) => {
   next(new NotFoundError('Страница не найдена'));
 });
