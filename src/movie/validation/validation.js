@@ -1,5 +1,5 @@
 const { Joi, celebrate } = require('celebrate');
-const {URL_REGEX} = require("../../utils/regex");
+const { URL_REGEX } = require('../../utils/regex');
 
 const createMovieValidation = celebrate({
   body: Joi.object().keys({
