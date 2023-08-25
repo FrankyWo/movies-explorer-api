@@ -1,46 +1,58 @@
+const { compare } = require('bcryptjs');
 const mongoose = require('mongoose');
-const validator = require('validator');
-const bcrypt = require('bcryptjs');
-const AuthorizationError = require('../errors/AuthorizationError');
+const { UnauthorizedError } = require('../errors/UnauthorizedError');
+const { EMAIL_REGEX } = require('../utils/regex');
 
-const userSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    minlength: 2,
-    maxlength: 30,
-  },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    validate: {
-      validator: (v) => validator.isEmail(v),
-      message: 'Неправильный формат почты',
+const { Schema } = mongoose;
+
+const userSchema = new Schema(
+  {
+    name: {
+      required: true,
+      type: String,
+      validate: {
+        validator: ({ length }) => length >= 2 && length <= 30,
+        message: 'Длина имени пользователя от 2 до 30 символов',
+      },
+    },
+
+    password: {
+      required: true,
+      type: String,
+      select: false,
+    },
+
+    email: {
+      required: true,
+      type: String,
+      unique: true,
+      validate: {
+        validator: (email) => EMAIL_REGEX.test(email),
+        message: 'Введите электронную почту',
+      },
     },
   },
-  password: {
-    type: String,
-    required: true,
-    select: false,
+
+  {
+    statics: {
+      findUserByCredentials(email, password) {
+        return (
+          this.findOne({ email })
+            .select('+password')
+        )
+          .then((user) => {
+            if (user) {
+              return compare(password, user.password)
+                .then((matched) => {
+                  if (matched) return user;
+                  return Promise.reject(new UnauthorizedError('Указан неправильный адрес почты или пароль'));
+                });
+            }
+            return Promise.reject(new UnauthorizedError('Указан неправильный адрес почты или пароль'));
+          });
+      },
+    },
   },
-});
-
-userSchema.statics.findUserByCredentials = function (email, password) {
-  return this.findOne({ email }).select('+password')
-    .then((user) => {
-      if (!user) {
-        return Promise.reject(new AuthorizationError('Указан неправильный адрес почты или пароль'));
-      }
-
-      return bcrypt.compare(password, user.password)
-        .then((matched) => {
-          if (!matched) {
-            return Promise.reject(new AuthorizationError('Указан неправильный адрес почты или пароль'));
-          }
-
-          return user;
-        });
-    });
-};
+);
 
 module.exports = mongoose.model('user', userSchema);

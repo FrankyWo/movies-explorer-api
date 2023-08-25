@@ -1,91 +1,100 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const NotFoundError = require('../errors/NotFoundError');
-const ValidationError = require('../errors/ValidationError');
-const ConflictError = require('../errors/ConflictError');
-const userModel = require('../models/user');
-// const created = require('../utils/const');
+const bcrypt = require('bcrypt');
+const UNAUTHORIZED_ERROR = require('../errors/UnauthorizedError');
+const BAD_REQUEST_ERROR = require('../errors/BadRequestError');
+const NOT_FOUND_ERROR = require('../errors/NotFoundError');
+const CONFLICT_ERROR = require('../errors/ConflictError');
+const { NODE_ENV, JWT_SECRET } = require('../utils/config');
+const { PASSWORD_REGEX } = require('../utils/regex');
+const User = require('../models/user');
 
-const { NODE_ENV, JWT_SECRET } = process.env;
-
-const login = (req, res, next) => {
+function login(req, res, next) {
   const { email, password } = req.body;
-  return userModel.findUserByCredentials(email, password)
-    .then((user) => {
-      const token = jwt.sign({ _id: user._id }, NODE_ENV === 'production' ? JWT_SECRET : 'some-secret-key', { expiresIn: '7d' });
-      res.send({ token });
-    })
-    .catch((err) => next(err));
-};
 
-const getUserInfo = (req, res, next) => {
-  userModel
-    .findById(req.user._id)
-    .orFail(new NotFoundError('Пользователь не найден'))
-    .then((user) => res.send(user))
-    .catch((err) => {
-      if (err.name === 'CastError') {
-        next(new ValidationError('Ошибка валидации'));
-      } else {
-        next(err);
+  if (!PASSWORD_REGEX.test(password)) throw new BAD_REQUEST_ERROR('Пароль не соответствует');
+
+  User
+    .findUserByCredentials(email, password)
+    .then(({ _id }) => {
+      if (_id) {
+        const token = jwt.sign(
+          { _id },
+          NODE_ENV === 'production' ? JWT_SECRET : 'dev-secret',
+          { expiresIn: '3d' },
+        );
+        return res.send({ token });
       }
-    });
-};
+      throw new UNAUTHORIZED_ERROR('401: Указан неправильный адрес почты или пароль');
+    })
+    .catch(next);
+}
 
-const createUser = (req, res, next) => {
-  bcrypt.hash(req.body.password, 10)
+function createUser(req, res, next) {
+  const { email, password, name } = req.body;
 
-    .then((hash) => userModel.create({
-      name: req.body.name,
-      email: req.body.email,
+  if (!PASSWORD_REGEX.test(password)) throw new BAD_REQUEST_ERROR('Пароль не соответствует');
+
+  bcrypt.hash(password, 10)
+    .then((hash) => User.create({
+      name,
+      email,
       password: hash,
     }))
-
-    .then((user) => {
-      res.status(201).send({
-        name: user.name,
-        email: user.email,
-        _id: user._id,
-      });
-    })
-
+    .then(() => res.status(201).send({ message: 'Пользователь зарегистрирован' }))
     .catch((err) => {
-      if (err.code === 11000) {
-        next(new ConflictError('Пользователь с указанным email уже существует'));
-      } else if (err instanceof mongoose.Error.ValidationError) {
-        next(new ValidationError('Ошибка валидации'));
-      } else { next(err); }
+      if (err.code === 11000) next(new CONFLICT_ERROR('Пользователь уже существует'));
+      else if (err.name === 'ValidationError') next(new BAD_REQUEST_ERROR('Неккоректные данные'));
+      else next(err);
     });
-};
+}
 
-const updateUser = (req, res, next) => {
-  userModel
+function getUserInfo(req, res, next) {
+  const { _id } = req.user;
+
+  User
+    .findById(_id)
+    .then((user) => {
+      if (user) return res.send(user);
+      throw new NOT_FOUND_ERROR('Пользователь не найден');
+    })
+    .catch((err) => {
+      if (err.name === 'CastError') next(new BAD_REQUEST_ERROR('Некорректный ID'));
+      else next(err);
+    });
+}
+
+function updateUserInfo(req, res, next) {
+  const { email, name } = req.body;
+  const { _id } = req.user;
+
+  User
     .findByIdAndUpdate(
-      req.user._id,
+      _id,
       {
-        name: req.body.name,
-        email: req.body.email,
+        email,
+        name,
       },
-      { new: true, runValidators: true },
+      {
+        new: true,
+        runValidators: true,
+      },
     )
-
     .then((user) => {
-      res.send(user);
+      if (user) return res.send(user);
+      throw new NOT_FOUND_ERROR('Пользователь не найден');
     })
-
     .catch((err) => {
-      if (err.code === 11000) {
-        next(new ConflictError('Пользователь с указанным email уже существует'));
-      } else if (err instanceof mongoose.Error.ValidationError) {
-        next(new ValidationError('Ошибка валидации'));
-      } else { next(err); }
+      if (err.code === 11000) return next(new CONFLICT_ERROR('Пользователь уже существует'));
+      if (err.name === 'CastError') return next(new BAD_REQUEST_ERROR('Некорректный ID'));
+      if (err.name === 'ValidationError') return next(new BAD_REQUEST_ERROR('Некорректные данные'));
+
+      return next(err);
     });
-};
+}
 
 module.exports = {
-  login,
+  updateUserInfo,
   getUserInfo,
   createUser,
-  updateUser,
+  login,
 };

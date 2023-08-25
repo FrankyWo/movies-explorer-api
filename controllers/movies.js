@@ -1,80 +1,80 @@
-const mongoose = require('mongoose');
-const movieModel = require('../models/movie');
-const NotFoundError = require('../errors/NotFoundError');
-const ValidationError = require('../errors/ValidationError');
-const ForbiddenError = require('../errors/ForbiddenError');
-// const created = require('../utils/const');
+const BAD_REQUEST_ERROR = require('../errors/BadRequestError');
+const FORBIDDEN_ERROR = require('../errors/ForbiddenError');
+const NOT_FOUND_ERROR = require('../errors/NotFoundError');
+const Movie = require('../models/movie');
 
-const getMovies = (req, res, next) => {
-  movieModel
-    .find({ owner: req.user._id })
-    .then((movies) => res.send(movies))
-    .catch((err) => next(err));
-};
+function getMovies(req, res, next) {
+  const { _id } = req.user;
 
-const createMovie = (req, res, next) => {
+  Movie
+    .find({ owner: _id })
+    .populate('owner', '_id')
+    .then((movies) => {
+      if (movies) return res.send(movies);
+      throw new NOT_FOUND_ERROR('Данные не найдены');
+    })
+    .catch((err) => {
+      if (err.name === 'CastError') next(new BAD_REQUEST_ERROR('Передан некорректный id пользователя'));
+      else next(err);
+    });
+}
+
+function createMovie(req, res, next) {
+  const { _id } = req.user;
   const {
-    movieId,
     country,
     director,
     duration,
     year,
     description,
     image,
-    trailerLink,
+    trailer,
     nameRU,
     nameEN,
     thumbnail,
+    movieId,
   } = req.body;
 
-  movieModel
+  Movie
     .create({
-      movieId,
       country,
       director,
       duration,
       year,
       description,
       image,
-      trailerLink,
+      trailer,
+      thumbnail,
       nameRU,
       nameEN,
-      thumbnail,
-      owner: req.user._id,
+      owner: _id,
+      movieId,
     })
-    .then((movie) => {
-      res.status(201).send(movie);
-    })
+    .then(() => res.status(201).send({ message: 'Фильм добавлен' }))
     .catch((err) => {
-      if (err instanceof mongoose.Error.ValidationError) {
-        next(new ValidationError('Ошибка валидации'));
-      } else {
-        next(err);
-      }
+      if (err.name === 'ValidationError') next(new BAD_REQUEST_ERROR('Некорректные данные'));
+      else next(err);
     });
-};
+}
 
-const deleteMovie = (req, res, next) => {
-  movieModel
-    .findById(req.params.movieId)
+function deleteMovie(req, res, next) {
+  const { id: movieId } = req.params;
+  const { _id: userId } = req.user;
+
+  Movie
+    .findById(movieId)
     .then((movie) => {
-      if (!movie) {
-        next(new NotFoundError('Фильм с указанным id не найден'));
-      } else if (movie.owner.toString() !== req.user._id) {
-        next(new ForbiddenError('Недостаточно прав для удаления'));
-      } else {
-        return movieModel.findByIdAndRemove(req.params.movieId)
-          .then((m) => res.send(m));
-      } return null;
+      if (!movie) throw new NOT_FOUND_ERROR('Фильм с указанным id не найден');
+
+      const { owner: movieOwnerId } = movie;
+      if (movieOwnerId.valueOf() !== userId) throw new FORBIDDEN_ERROR('Недостаточно прав для удаления');
+
+      movie.deleteOne()
+        .then(() => res.send({ message: 'Фильм удалён' }))
+        .catch(next);
     })
-    .catch((err) => {
-      if (err.name === 'CastError') {
-        next(new ValidationError('Ошибка валидации'));
-      } else {
-        next(err);
-      }
-    });
-};
+    .catch(next);
+}
 
 module.exports = {
   getMovies,

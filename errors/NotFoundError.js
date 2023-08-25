@@ -1,10 +1,6 @@
-const errorStatus = require('./errorStatuses');
-
-class NotFoundError extends Error {
+module.exports = class NotFoundError extends Error {
   constructor(message) {
     super(message);
-    this.statusCode = errorStatus.notFound;
+    this.status = 404;
   }
-}
-
-module.exports = NotFoundError;
+};
