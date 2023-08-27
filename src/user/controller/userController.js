@@ -1,17 +1,17 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const UNAUTHORIZED_ERROR = require('../errors/UnauthorizedError');
-const BAD_REQUEST_ERROR = require('../errors/BadRequestError');
-const NOT_FOUND_ERROR = require('../errors/NotFoundError');
-const CONFLICT_ERROR = require('../errors/ConflictError');
-const { NODE_ENV, JWT_SECRET } = require('../utils/config');
-const { PASSWORD_REGEX } = require('../utils/regex');
-const User = require('../models/user');
+const UNAUTHORIZED_ERROR = require('../../error/UnauthorizedError');
+const BAD_REQUEST_ERROR = require('../../error/BadRequestError');
+const { NODE_ENV, JWT_SECRET } = require('../../utils/config');
+const NOT_FOUND_ERROR = require('../../error/NotFoundError');
+const CONFLICT_ERROR = require('../../error/ConflictError');
+const { PASSWORD_REGEX } = require('../../utils/regex');
+const User = require('../model/user');
 
 function login(req, res, next) {
   const { email, password } = req.body;
 
-  if (!PASSWORD_REGEX.test(password)) throw new BAD_REQUEST_ERROR('Пароль не соответствует');
+  if (!PASSWORD_REGEX.test(password)) throw new BAD_REQUEST_ERROR('Пароль не соответствует регексу');
 
   User
     .findUserByCredentials(email, password)
@@ -24,7 +24,7 @@ function login(req, res, next) {
         );
         return res.send({ token });
       }
-      throw new UNAUTHORIZED_ERROR('401: Указан неправильный адрес почты или пароль');
+      throw new UNAUTHORIZED_ERROR('401: неверная электронная почта или пароль');
     })
     .catch(next);
 }
@@ -32,7 +32,7 @@ function login(req, res, next) {
 function createUser(req, res, next) {
   const { email, password, name } = req.body;
 
-  if (!PASSWORD_REGEX.test(password)) throw new BAD_REQUEST_ERROR('Пароль не соответствует');
+  if (!PASSWORD_REGEX.test(password)) throw new BAD_REQUEST_ERROR('Пароль не соответствует регексу');
 
   bcrypt.hash(password, 10)
     .then((hash) => User.create({

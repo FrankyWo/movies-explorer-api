@@ -1,7 +1,7 @@
 const { compare } = require('bcryptjs');
 const mongoose = require('mongoose');
-const { UnauthorizedError } = require('../errors/UnauthorizedError');
-const { EMAIL_REGEX } = require('../utils/regex');
+const { UnauthorizedError } = require('../../error/UnauthorizedError');
+const { EMAIL_REGEX } = require('../../utils/regex');
 
 const { Schema } = mongoose;
 
@@ -45,10 +45,10 @@ const userSchema = new Schema(
               return compare(password, user.password)
                 .then((matched) => {
                   if (matched) return user;
-                  return Promise.reject(new UnauthorizedError('Указан неправильный адрес почты или пароль'));
+                  return Promise.reject(new UnauthorizedError('Неверно указана почта или пароль'));
                 });
             }
-            return Promise.reject(new UnauthorizedError('Указан неправильный адрес почты или пароль'));
+            return Promise.reject(new UnauthorizedError('Неверно указана почта или пароль'));
           });
       },
     },

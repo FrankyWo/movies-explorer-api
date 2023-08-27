@@ -1,7 +1,7 @@
-const BAD_REQUEST_ERROR = require('../errors/BadRequestError');
-const FORBIDDEN_ERROR = require('../errors/ForbiddenError');
-const NOT_FOUND_ERROR = require('../errors/NotFoundError');
-const Movie = require('../models/movie');
+const BAD_REQUEST_ERROR = require('../../error/BadRequestError');
+const FORBIDDEN_ERROR = require('../../error/ForbiddenError');
+const NOT_FOUND_ERROR = require('../../error/NotFoundError');
+const Movie = require('../model/movie');
 
 function getMovies(req, res, next) {
   const { _id } = req.user;
@@ -64,10 +64,10 @@ function deleteMovie(req, res, next) {
   Movie
     .findById(movieId)
     .then((movie) => {
-      if (!movie) throw new NOT_FOUND_ERROR('Фильм с указанным id не найден');
+      if (!movie) throw new NOT_FOUND_ERROR('Данные не найдены');
 
       const { owner: movieOwnerId } = movie;
-      if (movieOwnerId.valueOf() !== userId) throw new FORBIDDEN_ERROR('Недостаточно прав для удаления');
+      if (movieOwnerId.valueOf() !== userId) throw new FORBIDDEN_ERROR('Нельзя удалить не свой фильм');
 
       movie.deleteOne()
         .then(() => res.send({ message: 'Фильм удалён' }))
