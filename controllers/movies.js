@@ -1,34 +1,23 @@
-const mongoose = require('mongoose');
-const movieModel = require('../models/movie');
-const NotFoundError = require('../errors/NotFoundError');
-const ValidationError = require('../errors/ValidationError');
-const ForbiddenError = require('../errors/ForbiddenError');
+const Movie = require('../models/movie');
+const CustomError = require('../utils/errors');
+const {
+  ERROR_BAD_REQUEST,
+  ERROR_FORBIDDEN,
+  ERROR_NOT_FOUND,
+} = require('../utils/constants');
 
-const getMovies = (req, res, next) => {
-  movieModel
-    .find({ owner: req.user._id })
-    .then((movies) => res.send(movies))
-    .catch((err) => next(err));
+const getMovies = async (req, res, next) => {
+  try {
+    const movies = await Movie.find({ owner: req.user._id });
+    res.send(movies);
+  } catch (err) {
+    next(err);
+  }
 };
 
-const createMovie = (req, res, next) => {
-  const {
-    movieId,
-    country,
-    director,
-    duration,
-    year,
-    description,
-    image,
-    trailerLink,
-    nameRU,
-    nameEN,
-    thumbnail,
-  } = req.body;
-
-  movieModel
-    .create({
-      movieId,
+const createMovie = async (req, res, next) => {
+  try {
+    const {
       country,
       director,
       duration,
@@ -36,47 +25,56 @@ const createMovie = (req, res, next) => {
       description,
       image,
       trailerLink,
+      thumbnail,
+      movieId,
       nameRU,
       nameEN,
+    } = req.body;
+
+    const movie = await Movie.create({
+      country,
+      director,
+      duration,
+      year,
+      description,
+      image,
       thumbnail,
+      trailerLink,
+      movieId,
       owner: req.user._id,
-    })
-    .then((movie) => {
-      res.status(201).send(movie);
-    })
-    .catch((err) => {
-      if (err instanceof mongoose.Error.ValidationError) {
-        next(new ValidationError('Ошибка валидации'));
-      } else {
-        next(err);
-      }
+      nameRU,
+      nameEN,
     });
+    // console.log('сообщение из консоли с фильмом', movie);
+    if (!movie) {
+      throw new CustomError(ERROR_NOT_FOUND, 'Неверные данные');
+    }
+    res.status(201).send(movie);
+  } catch (err) {
+    // console.log(err)
+    if (err.name === 'ValidationError') {
+      next(new CustomError(ERROR_BAD_REQUEST, 'Переданы неверные данные2'));
+      return;
+    }
+    next(err);
+  }
 };
 
-const deleteMovie = (req, res, next) => {
-  movieModel
-    .findById(req.params.movieId)
-    .then((movie) => {
-      if (!movie) {
-        next(new NotFoundError('Фильм с указанным id не найден'));
-      } else if (movie.owner.toString() !== req.user._id) {
-        next(new ForbiddenError('Недостаточно прав для удаления'));
-      } else {
-        return movieModel.findByIdAndRemove(req.params.movieId)
-          .then((m) => res.send(m));
-      } return null;
-    })
-    .catch((err) => {
-      if (err.name === 'CastError') {
-        next(new ValidationError('Ошибка валидации'));
-      } else {
-        next(err);
-      }
-    });
+const deleteMovie = async (req, res, next) => {
+  try {
+    const { movieId } = req.params;
+    const movie = await Movie.findById(movieId);
+    if (!movie) {
+      throw new CustomError(ERROR_NOT_FOUND, 'Нет прав на удаление!');
+    }
+    if (movie.owner.toString() !== req.user._id) {
+      throw new CustomError(ERROR_FORBIDDEN, 'Нет прав на удаление!!');
+    }
+    await movie.deleteOne();
+    res.send({ message: 'Фильм успешно удален!!!' });
+  } catch (err) {
+    next(err);
+  }
 };
 
-module.exports = {
-  getMovies,
-  createMovie,
-  deleteMovie,
-};
+module.exports = { getMovies, createMovie, deleteMovie };

@@ -1,27 +1,21 @@
 const jwt = require('jsonwebtoken');
-const AuthorizationError = require('../errors/AuthorizationError');
+const CustomError = require('../utils/errors');
+const { ERROR_UNAUTHORIZED } = require('../utils/constants');
 
-const { NODE_ENV, JWT_SECRET } = process.env;
+const { JWT_SECRET, NODE_ENV } = process.env;
 
+// console.log(JWT_SECRET, NODE_ENV);
 const auth = (req, res, next) => {
-  const { authorization } = req.headers;
-
-  if (!authorization || !authorization.startsWith('Bearer ')) {
-    return next(new AuthorizationError('Необходима авторизация'));
-  }
-
-  const token = authorization.replace('Bearer ', '');
-  let payload;
-
   try {
-    payload = jwt.verify(token, NODE_ENV === 'production' ? JWT_SECRET : 'some-secret-key');
+    const token = req.cookies.jwtToken;
+    if (!token) {
+      throw new CustomError(ERROR_UNAUTHORIZED, 'Пользователь не найден!');
+    }
+    req.user = jwt.verify(token, NODE_ENV === 'production' ? JWT_SECRET : 'key');
+    next();
   } catch (err) {
-    next(new AuthorizationError('Необходима авторизация'));
+    next(new CustomError(ERROR_UNAUTHORIZED, 'Пользователь не найден!!'));
   }
-
-  req.user = payload;
-
-  return next();
 };
 
 module.exports = auth;

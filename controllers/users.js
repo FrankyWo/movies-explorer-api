@@ -1,90 +1,174 @@
-const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const NotFoundError = require('../errors/NotFoundError');
-const ValidationError = require('../errors/ValidationError');
-const ConflictError = require('../errors/ConflictError');
-const userModel = require('../models/user');
+const User = require('../models/user');
+const CustomError = require('../utils/errors');
 
-const { NODE_ENV, JWT_SECRET } = process.env;
+const { JWT_SECRET, NODE_ENV } = process.env;
 
-const login = (req, res, next) => {
-  const { email, password } = req.body;
-  return userModel.findUserByCredentials(email, password)
-    .then((user) => {
-      const token = jwt.sign({ _id: user._id }, NODE_ENV === 'production' ? JWT_SECRET : 'some-secret-key', { expiresIn: '7d' });
-      res.send({ token });
-    })
-    .catch((err) => next(err));
+const {
+  ERROR_BAD_REQUEST,
+  ERROR_UNAUTHORIZED,
+  ERROR_NOT_FOUND,
+  ERROR_CONFLICT,
+} = require('../utils/constants');
+
+const getCurrentUser = async (req, res, next) => {
+  try {
+    const id = req.user._id;
+    console.log(id);
+    const user = await User.findById(id);
+    if (!user) {
+      throw new CustomError(ERROR_NOT_FOUND, 'Пользователь не найден');
+    }
+    res.send(user);
+  } catch (err) {
+    if (err.name === 'CastError' || err.name === 'ValidationError') {
+      next(new CustomError(ERROR_BAD_REQUEST, 'Переданы неверные данные'));
+      return;
+    }
+    next(err);
+  }
 };
 
-const getUserInfo = (req, res, next) => {
-  userModel
-    .findById(req.user._id)
-    .orFail(new NotFoundError('Пользователь не найден'))
-    .then((user) => res.send(user))
-    .catch((err) => {
-      if (err.name === 'CastError') {
-        next(new ValidationError('Ошибка валидации'));
-      } else {
-        next(err);
-      }
+const getUserById = async (req, res, next) => {
+  try {
+    const id = req.params.userId;
+    const user = await User.findById(id);
+    if (!user) {
+      throw new CustomError(ERROR_NOT_FOUND, 'Пользователь не найден');
+    }
+    res.send(user);
+  } catch (err) {
+    if (err.name === 'CastError' || err.name === 'ValidationError') {
+      next(new CustomError(ERROR_BAD_REQUEST, 'Переданы неверные данные'));
+      return;
+    }
+    next(err);
+  }
+};
+
+const createUser = async (req, res, next) => {
+  try {
+    const {
+      name, email, password,
+    } = req.body;
+    console.log(name, email, password);
+    if (!name || !email || !password) {
+      throw new CustomError(
+        ERROR_NOT_FOUND,
+        'При регистрации пользователя произошла ошибка.',
+      );
+    }
+
+    const passHashed = await bcrypt.hash(req.body.password, 10);
+
+    const user = await User.create({
+      name, email, password: passHashed,
     });
-};
-
-const createUser = (req, res, next) => {
-  bcrypt.hash(req.body.password, 10)
-
-    .then((hash) => userModel.create({
-      name: req.body.name,
-      email: req.body.email,
-      password: hash,
-    }))
-
-    .then((user) => {
-      res.status(201).send({
-        name: user.name,
-        email: user.email,
-        _id: user._id,
-      });
-    })
-
-    .catch((err) => {
-      if (err.code === 11000) {
-        next(new ConflictError('Пользователь с указанным email уже существует'));
-      } else if (err instanceof mongoose.Error.ValidationError) {
-        next(new ValidationError('Ошибка валидации'));
-      } else { next(err); }
+    if (!user) {
+      throw new CustomError(
+        ERROR_NOT_FOUND,
+        'При регистрации пользователя произошла ошибка.',
+      );
+    }
+    res.status(201).send({
+      name: user.name,
+      email,
     });
+  } catch (err) {
+    if (err.code === 11000) {
+      next(new CustomError(ERROR_CONFLICT, 'Пользователь с таким email уже существует'));
+      return;
+    }
+    if (err.name === 'ValidationError') {
+      next(
+        new CustomError(
+          ERROR_NOT_FOUND,
+          'При регистрации пользователя произошла ошибка.',
+        ),
+      );
+      return;
+    }
+    next(err);
+  }
 };
 
-const updateUser = (req, res, next) => {
-  userModel
-    .findByIdAndUpdate(
+const updateUser = async (req, res, next) => {
+  try {
+    const { name, email } = req.body;
+    const user = await User.findByIdAndUpdate(
       req.user._id,
-      {
-        name: req.body.name,
-        email: req.body.email,
-      },
+      { name, email },
       { new: true, runValidators: true },
-    )
+    );
+    if (!user) {
+      throw new CustomError(
+        ERROR_NOT_FOUND,
+        'При обновлении профиля произошла ошибка.',
+      );
+    }
+    res.send(user);
+  } catch (err) {
+    if (err.code === 11000) {
+      next(new CustomError(ERROR_CONFLICT, 'Пользователь с таким email уже существует'));
+      return;
+    }
+    if (err.name === 'CastError' || err.name === 'ValidationError') {
+      next(
+        new CustomError(
+          ERROR_BAD_REQUEST,
+          'При обновлении профиля произошла ошибка.',
+        ),
+      );
+      return;
+    }
+    next(err);
+  }
+};
 
-    .then((user) => {
-      res.send(user);
-    })
+const login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
 
-    .catch((err) => {
-      if (err.code === 11000) {
-        next(new ConflictError('Пользователь с указанным email уже существует'));
-      } else if (err instanceof mongoose.Error.ValidationError) {
-        next(new ValidationError('Ошибка валидации'));
-      } else { next(err); }
-    });
+    const user = await User.findOne({ email }).select('+password');
+    const isMatched = await bcrypt.compare(password, user.password);
+
+    if (!user || !isMatched) {
+      throw new CustomError(
+        ERROR_UNAUTHORIZED,
+        'Вы ввели неправильный логин или пароль.',
+      );
+    }
+
+    const token = jwt.sign(
+      { _id: user._id },
+      NODE_ENV === 'production' ? JWT_SECRET : 'вжух',
+      { expiresIn: '7d' },
+    );
+    const cookieOption = {
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000,
+    };
+    res.cookie('jwtToken', token, cookieOption); // maxAge: 24 hours
+    res.send({ message: 'Вход выполнен' });
+  } catch (err) {
+    next(
+      new CustomError(
+        ERROR_UNAUTHORIZED,
+        'При авторизации произошла ошибка. Токен не передан или передан не в том формате.',
+      ),
+    );
+  }
+};
+
+const logout = async (req, res, next) => {
+  try {
+    res.clearCookie('jwtToken').send({ message: 'Выполнен выход' });
+  } catch (err) {
+    next(err);
+  }
 };
 
 module.exports = {
-  login,
-  getUserInfo,
-  createUser,
-  updateUser,
+  getCurrentUser, getUserById, createUser, updateUser, login, logout,
 };
