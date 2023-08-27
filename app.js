@@ -12,15 +12,18 @@ const errorHandler = require('./middlewares/errorHandlers');
 
 const router = require('./routes/index');
 
-const { PORT = 3000, DB_URL = 'mongodb://127.0.0.1:27017/bitfilmsdb' } = process.env;
+const { PORT = 3000 } = process.env;
 const app = express();
 
-mongoose.connect(DB_URL, { useNewUrlParser: true })
-  .then(() => console.log('Подключение к базе данных успешно'))
-  .catch((err) => {
-    console.log('Ошибка подключения к базе данных', err);
-    process.exit(1);
-  });
+const { BD_NAME, NODE_ENV } = process.env;
+
+mongoose.connect(
+  `mongodb://localhost:27017/${NODE_ENV === 'production' ? BD_NAME : 'local'}`,
+  {
+    useNewUrlParser: true,
+    family: 4,
+  },
+);
 
 const corsOptions = {
   origin: [
