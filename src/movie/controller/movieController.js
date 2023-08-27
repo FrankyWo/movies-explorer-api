@@ -67,7 +67,7 @@ function deleteMovie(req, res, next) {
       if (!movie) throw new NOT_FOUND_ERROR('Данные не найдены');
 
       const { owner: movieOwnerId } = movie;
-      if (movieOwnerId.valueOf() !== userId) throw new FORBIDDEN_ERROR('Нельзя удалить не свой фильм');
+      if (movieOwnerId.valueOf() !== userId) throw new FORBIDDEN_ERROR('Недостаточно прав');
 
       movie.deleteOne()
         .then(() => res.send({ message: 'Фильм удалён' }))
