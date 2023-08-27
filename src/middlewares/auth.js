@@ -10,7 +10,7 @@ const auth = (req, res, next) => {
   if (!authorization || !authorization.startsWith('Bearer ')) return next(new UnauthorizedError('Необходимо авторизироваться'));
 
   try {
-    payload = jwt.verify(token, JWT_SECRET);
+    payload = jwt.verify(token, process.env.NODE_ENV === 'production' ? JWT_SECRET : 'dev-secret');
   } catch (err) {
     next(new UnauthorizedError('Необходимо авторизироваться'));
   }
