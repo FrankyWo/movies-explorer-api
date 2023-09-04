@@ -11,7 +11,7 @@ Frontend <https://github.com/FrankyWo/movies-explorer-frontend>
 ---
 
 
-## Available Script
+## Available Scripts
 
 In the project directory, you can run:
 
