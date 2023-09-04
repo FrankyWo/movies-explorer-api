@@ -1,20 +1,16 @@
-# Project: Movies Explorer (API)
+#  movies-explorer-api
 
-## **Links**
+## Директории
 
-IP 158.160.20.52
+`/routes` — папка с файлами роутера  
+`/controllers` — папка с файлами контроллеров пользователя и карточки  
+`/models` — папка с файлами описания схем пользователя и карточки
 
-Backend <https://api.frankywoo.movies.nomoredomains.sbs>
+## Запуск проекта
 
-Frontend <https://github.com/FrankyWo/movies-explorer-frontend>
+`npm run start` — запускает сервер  
+`npm run dev` — запускает сервер с hot-reload
 
----
+Cсылка на репозиторий GitHub: https://github.com/FrankyWo/movies-explorer-api.git
 
-
-## Available Scripts
-
-In the project directory, you can run:
-
-`npm run start` — starts server\
-`npm run dev` — starts server with hot-reload\
-`npm run lint` —  checks for linter (eslint) error
+Backend https://api.frankywoo.movies.nomoredomains.sbs
