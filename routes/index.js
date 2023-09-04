@@ -1,20 +1,18 @@
 const router = require('express').Router();
-const { validatorSignUp, validatorSignIn } = require('../middlewares/validators');
 
-const usersRouter = require('./usersRouter');
-const moviesRouter = require('./moviesRouter');
-const { createUser, login, signout } = require('../controllers/users');
-const auth = require('../middlewares/auth');
-const NotFoundError = require('../answersServer/customsErrors/NotFoundError');
+const usersRouter = require('../components/user/router');
+const moviesRouter = require('../components/movie/router');
+const notFoundRouter = require('../components/not-found/router');
+const { createUser, signIn, signOut } = require('../components/user/controller');
+const { auth } = require('../middlewares');
+const { validateUserCredentialOnSignUp, validateUserCredentialOnSignIn } = require('../components/user/validators');
 
-router.post('/signup', validatorSignUp, createUser);
-router.post('/signin', validatorSignIn, login);
+router.post('/signup', validateUserCredentialOnSignUp, createUser);
+router.post('/signin', validateUserCredentialOnSignIn, signIn);
+router.post('/signout', auth, signOut);
 
 router.use('/users', auth, usersRouter);
 router.use('/movies', auth, moviesRouter);
-
-router.delete('/signout', auth, signout);
-
-router.use('/*', auth, (req, res, next) => next(new NotFoundError('По указанному url ничего нет.')));
+router.use(auth, notFoundRouter);
 
 module.exports = router;

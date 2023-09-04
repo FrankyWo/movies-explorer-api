@@ -1,23 +1,29 @@
-const jwt = require('jsonwebtoken');
-const UnauthorizedError = require('../answersServer/customsErrors/UnauthorizedError');
+const { AuthError } = require('../errors');
+const { verifyToken } = require('../utils');
 
-const { NODE_ENV, JWT_SECRET } = process.env;
-const { JWT_SECRET_DEV } = require('../utils/constants');
+/**
+ * gets token from cookies, if token is verified, sets payload to req.user
+ * otherwise throw auth error
+ * @param {Request} req
+ * @param {Response} _
+ * @param {import('express').NextFunction} next
+ * @returns
+ */
+function auth(req, _, next) {
+  const { token } = req.cookies;
 
-const auth = (req, res, next) => {
-  let payload;
-  const token = req.cookies.jwt;
-  if (!token) {
-    next(new UnauthorizedError('Необходимо авторизоваться'));
-    return;
-  }
   try {
-    payload = jwt.verify(token, NODE_ENV === 'production' ? JWT_SECRET : JWT_SECRET_DEV);
+    if (!token) {
+      next(new AuthError('Требуется авторизация'));
+      return;
+    }
+
+    const payload = verifyToken(token);
+    req.user = payload;
+    next();
   } catch (err) {
-    next(new UnauthorizedError('Необходимо авторизоваться'));
-    return;
+    next(new AuthError('Передан невалидный токен'));
   }
-  req.user = payload;
-  next();
-};
+}
+
 module.exports = auth;
