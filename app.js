@@ -31,4 +31,6 @@ app.use(errorLogger);
 app.use(handleCelebrateErrors);
 app.use(handleError);
 
-app.listen(PORT);
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
