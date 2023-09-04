@@ -1,36 +1,27 @@
 require('dotenv').config();
-
 const express = require('express');
 const mongoose = require('mongoose');
-const helmet = require('helmet');
+const { errors } = require('celebrate');
 const cookieParser = require('cookie-parser');
-
-const { PORT, BD_URL } = require('./configs');
-const limiter = require('./configs/limiter-config');
-const router = require('./routes');
-const {
-  handleError, requestLogger, errorLogger, handleCors, handleCelebrateErrors,
-} = require('./middlewares');
+const helmet = require('helmet');
+const cors = require('cors');
+const { limiter } = require('./middlewares/limiter');
+const { centralizedErrorHandling } = require('./middlewares/centralizedErrorHandling');
+const { requestLogger, errorLogger } = require('./middlewares/logger');
+const routes = require('./routes/index');
+const { PORT, MONGODB_URL, options } = require('./utils/constants');
 
 const app = express();
-mongoose.connect(BD_URL, {
-  useNewUrlParser: true,
-});
 
+app.use('*', cors(options));
 app.use(limiter);
-app.use(helmet());
+mongoose.connect(MONGODB_URL, { useNewUrlParser: true });
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
+app.use(helmet());
 app.use(requestLogger);
-app.use(handleCors);
-app.use(router);
+app.use(routes);
+app.listen(PORT);
 app.use(errorLogger);
-
-app.use(handleCelebrateErrors);
-app.use(handleError);
-
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+app.use(errors());
+app.use(centralizedErrorHandling);
