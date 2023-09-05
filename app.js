@@ -1,44 +1,40 @@
-const cors = require('cors');
-const { errors } = require('celebrate');
-const mongoose = require('mongoose');
+require('dotenv').config();
+
 const express = require('express');
+const mongoose = require('mongoose');
 const helmet = require('helmet');
-const { requestLogger, errorLogger } = require('./src/middlewares/logger');
-const limiter = require('./src/middlewares/rateLimiter');
-const { MONGO_URL } = require('./src/utils/config');
-const router = require('./src/routes/index');
+const cookieParser = require('cookie-parser');
+
+const { BD_URL } = require('./configs');
 
 const { PORT = 3000 } = process.env;
 
+const limiter = require('./configs/limiter-config');
+const router = require('./routes');
+const {
+  handleError, requestLogger, errorLogger, handleCors, handleCelebrateErrors,
+} = require('./middlewares');
+
 const app = express();
-app.use(express.json());
-app.use(cors());
+
+app.use(limiter);
 app.use(helmet());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 app.use(requestLogger);
-app.use(limiter);
+app.use(handleCors);
 app.use(router);
 app.use(errorLogger);
-app.use(errors());
 
-app.use((error, request, response, next) => {
-  const {
-    status = 500,
-    message,
-  } = error;
-  response.status(status)
-    .send({
-      message: status === 500
-        ? 'На сервере произошла ошибка'
-        : message,
-    });
-  next();
-});
+app.use(handleCelebrateErrors);
+app.use(handleError);
 
 async function start() {
   mongoose.set('strictQuery', false);
   try {
-    await mongoose.connect(MONGO_URL);
+    await mongoose.connect(BD_URL);
     await app.listen(PORT);
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -48,4 +44,4 @@ async function start() {
 
 start()
   // eslint-disable-next-line no-console
-  .then(() => console.log(`App has been successfully started!\n${MONGO_URL}\nPort: ${PORT}`));
+  .then(() => console.log(`App has been successfully started!\n${BD_URL}\nPort: ${PORT}`));
