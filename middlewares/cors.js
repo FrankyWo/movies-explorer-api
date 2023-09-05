@@ -1,6 +1,6 @@
 const allowedCors = [
-  'http://allmovies.nomoredomains.rocks',
-  'https://allmovies.nomoredomains.rocks',
+  'http://frankywoo.movies.nomoredomains.sbs',
+  'https://frankywoo.movies.nomoredomains.sbs',
   'http://localhost:3000',
   'http://localhost:3001',
 ];
